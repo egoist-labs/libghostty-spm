@@ -25,7 +25,9 @@ final class TerminalCallbackBridge {
         self.delegate = delegate
     }
 
-    func handleAction(_ action: ghostty_action_s) {
+    /// Dispatches an action and reports whether the host handled it. Ghostty
+    /// uses the return value to decide whether to run its platform fallback.
+    func handleAction(_ action: ghostty_action_s) -> Bool {
         switch action.tag {
         case GHOSTTY_ACTION_SET_TITLE:
             if let cStr = action.action.set_title.title {
@@ -101,6 +103,9 @@ final class TerminalCallbackBridge {
                 .terminalDidRequestDesktopNotification(title: title, body: body)
 
         case GHOSTTY_ACTION_OPEN_URL:
+            guard let delegate = delegate as? any TerminalSurfaceOpenURLDelegate else {
+                return false
+            }
             let payload = action.action.open_url
             let kind = TerminalOpenURLKind(payload.kind)
             let url: String = payload.url.map { ptr in
@@ -113,8 +118,8 @@ final class TerminalCallbackBridge {
                 .actions,
                 "callback action=open_url kind=\(kind) url=\(TerminalDebugLog.describe(url))"
             )
-            (delegate as? any TerminalSurfaceOpenURLDelegate)?
-                .terminalDidRequestOpenURL(url, kind: kind)
+            delegate.terminalDidRequestOpenURL(url, kind: kind)
+            return true
 
         case GHOSTTY_ACTION_MOUSE_OVER_LINK:
             let payload = action.action.mouse_over_link
@@ -163,6 +168,7 @@ final class TerminalCallbackBridge {
                 "callback action=\(TerminalDebugLog.describe(action.tag))"
             )
         }
+        return false
     }
 
     func handleClose(processAlive: Bool) {

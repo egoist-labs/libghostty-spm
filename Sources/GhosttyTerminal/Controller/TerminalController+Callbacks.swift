@@ -36,11 +36,9 @@ private enum TerminalCallbacks {
         let bridge = Unmanaged<TerminalCallbackBridge>
             .fromOpaque(bridgePtr)
             .takeUnretainedValue()
-        terminalRunOnMain {
+        return terminalRunOnMainSync {
             bridge.handleAction(action)
         }
-
-        return false
     }
 
     static func closeSurface(
