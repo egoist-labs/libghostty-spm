@@ -172,6 +172,52 @@ final class TerminalCallbackBridge {
                     )
                 )
 
+        case GHOSTTY_ACTION_START_SEARCH:
+            guard let delegate = delegate as? any TerminalSurfaceSearchDelegate else {
+                return false
+            }
+            // Empty for a bare `start_search`; a resolved needle when the
+            // action carried terms of its own (e.g. `search_selection`).
+            let needle = action.action.start_search.needle
+                .map { String(cString: $0) } ?? ""
+            TerminalDebugLog.log(
+                .actions,
+                "callback action=start_search needle=\(TerminalDebugLog.describe(needle))"
+            )
+            delegate.terminalDidStartSearch(needle: needle)
+            return true
+
+        case GHOSTTY_ACTION_END_SEARCH:
+            guard let delegate = delegate as? any TerminalSurfaceSearchDelegate else {
+                return false
+            }
+            TerminalDebugLog.log(.actions, "callback action=end_search")
+            delegate.terminalDidEndSearch()
+            return true
+
+        case GHOSTTY_ACTION_SEARCH_TOTAL:
+            guard let delegate = delegate as? any TerminalSurfaceSearchDelegate else {
+                return false
+            }
+            // ssize_t: negative means the count isn't known yet.
+            let total = action.action.search_total.total
+            TerminalDebugLog.log(.actions, "callback action=search_total total=\(total)")
+            delegate.terminalDidUpdateSearchTotal(total < 0 ? nil : Int(total))
+            return true
+
+        case GHOSTTY_ACTION_SEARCH_SELECTED:
+            guard let delegate = delegate as? any TerminalSurfaceSearchDelegate else {
+                return false
+            }
+            // ssize_t: negative means no match is selected.
+            let selected = action.action.search_selected.selected
+            TerminalDebugLog.log(
+                .actions,
+                "callback action=search_selected selected=\(selected)"
+            )
+            delegate.terminalDidUpdateSearchSelected(selected < 0 ? nil : Int(selected))
+            return true
+
         default:
             TerminalDebugLog.log(
                 .actions,

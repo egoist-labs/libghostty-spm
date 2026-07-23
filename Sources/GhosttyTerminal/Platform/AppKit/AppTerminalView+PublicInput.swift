@@ -39,5 +39,42 @@
         public func scrollToRow(_ row: UInt) -> Bool {
             surface?.scrollToRow(row) ?? false
         }
+
+        /// Whether the grid currently holds a selection.
+        public var hasSelection: Bool {
+            surface?.hasSelection() ?? false
+        }
+
+        /// Search the screen and scrollback for `needle`, replacing any active
+        /// search. An empty needle cancels without dismissing host search UI.
+        @discardableResult
+        public func search(_ needle: String) -> Bool {
+            surface?.search(needle) ?? false
+        }
+
+        /// Search for the current selection; no-op without one.
+        @discardableResult
+        public func searchSelection() -> Bool {
+            surface?.searchSelection() ?? false
+        }
+
+        /// Open search with no terms set, reported back through
+        /// ``TerminalSurfaceSearchDelegate``.
+        @discardableResult
+        public func startSearch() -> Bool {
+            surface?.startSearch() ?? false
+        }
+
+        /// Select the next or previous match of the active search.
+        @discardableResult
+        public func navigateSearch(forward: Bool) -> Bool {
+            surface?.navigateSearch(forward: forward) ?? false
+        }
+
+        /// End the active search and clear its highlights.
+        @discardableResult
+        public func endSearch() -> Bool {
+            surface?.endSearch() ?? false
+        }
     }
 #endif

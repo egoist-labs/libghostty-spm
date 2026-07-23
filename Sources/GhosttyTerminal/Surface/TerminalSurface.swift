@@ -149,6 +149,47 @@ public final class TerminalSurface {
         performBindingAction("scroll_to_row:\(row)")
     }
 
+    // MARK: - Search
+
+    /// Start a search over the screen and scrollback for `needle`, replacing
+    /// any search already running.
+    ///
+    /// An empty needle cancels the search but leaves the host's search UI
+    /// alone; use ``endSearch()`` to tear that down as well. Matches are
+    /// highlighted by Ghostty's own renderer, and progress is reported back
+    /// through ``TerminalSurfaceSearchDelegate``.
+    @discardableResult
+    public func search(_ needle: String) -> Bool {
+        performBindingAction("search:\(needle)")
+    }
+
+    /// Start a search for the current selection. Does nothing when there is
+    /// no selection; otherwise it behaves exactly like ``search(_:)``, with
+    /// the resolved needle reported back via the start-search callback.
+    @discardableResult
+    public func searchSelection() -> Bool {
+        performBindingAction("search_selection")
+    }
+
+    /// Open search without setting any terms, so a host can show its search
+    /// UI through the same callback path a `search` keybind would use.
+    @discardableResult
+    public func startSearch() -> Bool {
+        performBindingAction("start_search")
+    }
+
+    /// Move the selection to the next or previous match of the active search.
+    @discardableResult
+    public func navigateSearch(forward: Bool) -> Bool {
+        performBindingAction("navigate_search:\(forward ? "next" : "previous")")
+    }
+
+    /// End the active search, clearing its highlights.
+    @discardableResult
+    public func endSearch() -> Bool {
+        performBindingAction("end_search")
+    }
+
     // MARK: - Rendering
 
     func draw() {

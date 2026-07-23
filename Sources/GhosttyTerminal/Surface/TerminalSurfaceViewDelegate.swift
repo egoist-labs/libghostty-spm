@@ -138,6 +138,27 @@ public protocol TerminalSurfaceScrollbarDelegate: TerminalSurfaceViewDelegate {
     func terminalDidUpdateScrollbar(_ scrollbar: TerminalScrollbar)
 }
 
+/// Progress of the terminal's own screen/scrollback search, driven by
+/// ``TerminalSurface/search(_:)`` and friends. Ghostty searches on a
+/// background thread and highlights matches in its renderer, so a host only
+/// has to present search UI and report these counts.
+///
+/// `total` and `selected` arrive independently and may lag the needle;
+/// Ghostty reports a negative count while a total is not yet known and a
+/// negative index while no match is selected, both surfaced here as nil.
+@MainActor
+public protocol TerminalSurfaceSearchDelegate: TerminalSurfaceViewDelegate {
+    /// A search began — either from ``TerminalSurface/startSearch()`` with no
+    /// terms yet (empty needle), or with the terms a search action resolved,
+    /// such as the selection behind ``TerminalSurface/searchSelection()``.
+    func terminalDidStartSearch(needle: String)
+    func terminalDidEndSearch()
+    /// Matches found so far, or nil while the count is unknown.
+    func terminalDidUpdateSearchTotal(_ total: Int?)
+    /// Zero-based index of the highlighted match, or nil when none is.
+    func terminalDidUpdateSearchSelected(_ selected: Int?)
+}
+
 /// User long-pressed to request a selection-page presentation.
 public struct TerminalTextSelectionRequest: Sendable {
     /// Viewport text snapshot. Lines separated by `\n`.
