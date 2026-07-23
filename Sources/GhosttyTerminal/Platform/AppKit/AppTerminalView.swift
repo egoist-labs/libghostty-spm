@@ -20,6 +20,11 @@
         var pendingSelectionMenuPoint: CGPoint?
         var onFocusChange: ((Bool) -> Void)?
 
+        /// Pointer shape ghostty last asked for. Seeded with `.text` because
+        /// that is what the grid resolves to, and ghostty only emits the action
+        /// once the pointer actually moves over the surface.
+        public internal(set) var mouseShape: TerminalMouseShape = .text
+
         open weak var delegate: (any TerminalSurfaceViewDelegate)? {
             get { core.delegate }
             set { core.delegate = newValue }
@@ -95,6 +100,9 @@
             }
             core.onPostRender = { [weak self] in
                 self?.enforceMetalLayerScale()
+            }
+            core.onMouseShapeChange = { [weak self] shape in
+                self?.applyMouseShape(shape)
             }
         }
 

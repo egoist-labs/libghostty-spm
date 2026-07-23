@@ -20,6 +20,7 @@ final class TerminalCallbackBridge {
     nonisolated(unsafe) var rawSurface: ghostty_surface_t?
     var onCellSizeChange: ((UInt32, UInt32) -> Void)?
     var onRenderRequest: (() -> Void)?
+    var onMouseShapeChange: ((TerminalMouseShape) -> Void)?
 
     init(delegate: (any TerminalSurfaceViewDelegate)? = nil) {
         self.delegate = delegate
@@ -119,6 +120,15 @@ final class TerminalCallbackBridge {
                 "callback action=open_url kind=\(kind) url=\(TerminalDebugLog.describe(url))"
             )
             delegate.terminalDidRequestOpenURL(url, kind: kind)
+            return true
+
+        case GHOSTTY_ACTION_MOUSE_SHAPE:
+            let shape = TerminalMouseShape(action.action.mouse_shape)
+            TerminalDebugLog.log(
+                .actions,
+                "callback action=mouse_shape shape=\(shape)"
+            )
+            onMouseShapeChange?(shape)
             return true
 
         case GHOSTTY_ACTION_MOUSE_OVER_LINK:

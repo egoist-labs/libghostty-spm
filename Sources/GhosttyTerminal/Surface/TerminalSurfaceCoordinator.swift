@@ -45,6 +45,7 @@ final class TerminalSurfaceCoordinator {
     var platformSetup: ((inout ghostty_surface_config_s) -> Void)?
     var onMetricsUpdate: (() -> Void)?
     var onCellSizeDidChange: (() -> Void)?
+    var onMouseShapeChange: ((TerminalMouseShape) -> Void)?
 
     /// Called after every display-link render (`tick`).
     ///
@@ -76,6 +77,9 @@ final class TerminalSurfaceCoordinator {
         }
         bridge.onRenderRequest = { [weak self] in
             self?.requestImmediateTick()
+        }
+        bridge.onMouseShapeChange = { [weak self] shape in
+            self?.onMouseShapeChange?(shape)
         }
     }
 
