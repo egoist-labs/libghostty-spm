@@ -139,8 +139,14 @@ final class TerminalSurfaceCoordinator {
         let newSurface = TerminalSurface(rawSurface)
         surface = newSurface
         newSurface.setOcclusion(effectiveSurfaceVisible)
+        // Gate the app tick on attachment, not on render eligibility. An
+        // occluded-but-attached surface must still drain process/title/bell
+        // and child-exit events from `ghostty_app_tick`; only drawing is
+        // suppressed. Gating this on `canRenderFrame` instead would silence
+        // background surfaces entirely the moment a host marks them
+        // not-visible, which is what hosts do to release renderer memory.
         controller.shouldProcessWakeup = { [weak self] in
-            self?.canRenderFrame == true
+            self?.isAttached() == true
         }
         controller.onWakeup = { [weak self] in
             self?.requestImmediateTick()

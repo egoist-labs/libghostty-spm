@@ -65,6 +65,10 @@
             metal.device = MTLCreateSystemDefaultDevice()
             metal.pixelFormat = .bgra8Unorm
             metal.framebufferOnly = true
+            // Terminals redraw on input, not on a steady animation clock, so
+            // the third drawable only ever adds a full pane-sized IOSurface
+            // (20 MB+ at a typical retina pane) without buying latency back.
+            metal.maximumDrawableCount = 2
             metal.contentsScale = NSScreen.main?.backingScaleFactor ?? 2.0
             metal.isOpaque = false
             metal.backgroundColor = NSColor.clear.cgColor
