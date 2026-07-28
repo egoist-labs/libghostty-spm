@@ -1,6 +1,10 @@
 @testable import GhosttyTerminal
 import Testing
 
+#if canImport(AppKit) && !canImport(UIKit)
+    import AppKit
+#endif
+
 @MainActor
 struct TerminalLifecycleTests {
     @Test
@@ -110,4 +114,36 @@ struct TerminalLifecycleTests {
         coordinator.setDisplayVisible(true)
         #expect(transitions == ["suspend", "resume"])
     }
+
+    #if canImport(AppKit) && !canImport(UIKit)
+        @Test
+        func `active Metal renderer scale updates its drawable size`() throws {
+            let view = AppTerminalView(
+                frame: NSRect(x: 0, y: 0, width: 800, height: 600)
+            )
+            let metalLayer = try #require(view.layer as? CAMetalLayer)
+
+            view.updateActiveRendererLayer(scale: 0.1)
+
+            #expect(metalLayer.contentsScale == 0.1)
+            #expect(metalLayer.drawableSize == CGSize(width: 80, height: 60))
+        }
+
+        @Test
+        func `metric updates preserve compacted active Metal layer`() throws {
+            let view = AppTerminalView(
+                frame: NSRect(x: 0, y: 0, width: 800, height: 600)
+            )
+            let metalLayer = try #require(view.layer as? CAMetalLayer)
+            let compactDrawableSize = CGSize(width: 80, height: 60)
+            view.rendererTargetsCompacted = true
+            metalLayer.contentsScale = 0.1
+            metalLayer.drawableSize = compactDrawableSize
+
+            view.updateMetalLayerMetrics()
+
+            #expect(metalLayer.contentsScale == 0.1)
+            #expect(metalLayer.drawableSize == compactDrawableSize)
+        }
+    #endif
 }
