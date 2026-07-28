@@ -91,4 +91,23 @@ struct TerminalLifecycleTests {
 
         #expect(renders == 1)
     }
+
+    @Test
+    func `render resource hooks follow display visibility edges`() {
+        let coordinator = TerminalSurfaceCoordinator()
+        coordinator.isAttached = { true }
+        var transitions: [String] = []
+        coordinator.onRenderSuspended = {
+            transitions.append("suspend")
+        }
+        coordinator.onRenderResuming = {
+            transitions.append("resume")
+        }
+
+        coordinator.setDisplayVisible(false)
+        #expect(transitions == ["suspend"])
+
+        coordinator.setDisplayVisible(true)
+        #expect(transitions == ["suspend", "resume"])
+    }
 }

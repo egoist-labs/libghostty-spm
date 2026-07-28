@@ -19,6 +19,7 @@
         var lastPointerSelectionRect: CGRect?
         var pendingSelectionMenuPoint: CGPoint?
         var onFocusChange: ((Bool) -> Void)?
+        var rendererTargetsCompacted = false
 
         /// Pointer shape ghostty last asked for. Seeded with `.text` because
         /// that is what the grid resolves to, and ghostty only emits the action
@@ -107,6 +108,12 @@
             }
             core.onMouseShapeChange = { [weak self] shape in
                 self?.applyMouseShape(shape)
+            }
+            core.onRenderSuspended = { [weak self] in
+                self?.compactRendererTargets()
+            }
+            core.onRenderResuming = { [weak self] in
+                self?.restoreRendererTargets()
             }
         }
 
