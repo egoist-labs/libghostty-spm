@@ -23,7 +23,7 @@
             guard compactScale < layer.contentsScale else { return }
 
             rendererTargetsCompacted = true
-            layer.contentsScale = compactScale
+            updateActiveRendererLayer(scale: compactScale)
             for _ in 0..<3 {
                 surface.draw()
             }

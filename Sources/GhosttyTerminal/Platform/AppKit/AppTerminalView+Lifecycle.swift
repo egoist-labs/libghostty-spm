@@ -181,21 +181,29 @@
             // window crosses to a display with a different
             // backingScaleFactor.
             if !rendererTargetsCompacted {
-                layer?.contentsScale = scale
-                if let metal = layer as? CAMetalLayer {
-                    metal.drawableSize = CGSize(
-                        width: bounds.width * scale,
-                        height: bounds.height * scale
-                    )
-                }
+                updateActiveRendererLayer(scale: scale)
             }
             // Mirror to the cached ivar in case anything else still
-            // reads through it during a transitional layout pass.
-            metalLayer?.contentsScale = scale
-            metalLayer?.drawableSize = CGSize(
-                width: bounds.width * scale,
-                height: bounds.height * scale
-            )
+            // reads through it during a transitional layout pass. When the
+            // cached layer is still attached, though, restoring its full-size
+            // metrics here would immediately undo hidden-target compaction.
+            if !rendererTargetsCompacted || metalLayer !== layer {
+                metalLayer?.contentsScale = scale
+                metalLayer?.drawableSize = CGSize(
+                    width: bounds.width * scale,
+                    height: bounds.height * scale
+                )
+            }
+        }
+
+        func updateActiveRendererLayer(scale: CGFloat) {
+            layer?.contentsScale = scale
+            if let metal = layer as? CAMetalLayer {
+                metal.drawableSize = CGSize(
+                    width: bounds.width * scale,
+                    height: bounds.height * scale
+                )
+            }
         }
 
         func enforceMetalLayerScale() {
