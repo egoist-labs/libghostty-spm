@@ -180,12 +180,14 @@
             // observable symptom is text rendered at half size after the
             // window crosses to a display with a different
             // backingScaleFactor.
-            layer?.contentsScale = scale
-            if let metal = layer as? CAMetalLayer {
-                metal.drawableSize = CGSize(
-                    width: bounds.width * scale,
-                    height: bounds.height * scale
-                )
+            if !rendererTargetsCompacted {
+                layer?.contentsScale = scale
+                if let metal = layer as? CAMetalLayer {
+                    metal.drawableSize = CGSize(
+                        width: bounds.width * scale,
+                        height: bounds.height * scale
+                    )
+                }
             }
             // Mirror to the cached ivar in case anything else still
             // reads through it during a transitional layout pass.
@@ -197,6 +199,7 @@
         }
 
         func enforceMetalLayerScale() {
+            guard !rendererTargetsCompacted else { return }
             let scale = core.scaleFactor()
             if let layer, layer.contentsScale != scale {
                 layer.contentsScale = scale

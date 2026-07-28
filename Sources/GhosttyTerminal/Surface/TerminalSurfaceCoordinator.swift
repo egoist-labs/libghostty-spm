@@ -46,6 +46,13 @@ final class TerminalSurfaceCoordinator {
     var onMetricsUpdate: (() -> Void)?
     var onCellSizeDidChange: (() -> Void)?
     var onMouseShapeChange: ((TerminalMouseShape) -> Void)?
+    /// Platform renderers use display-visibility edges to discard expensive
+    /// presentation resources while the terminal core, PTY, and scrollback
+    /// stay alive. Application activation does not drive these hooks: the
+    /// selected surface remains visibly composited when its window blurs and
+    /// therefore must keep a full-size frame.
+    var onRenderSuspended: (() -> Void)?
+    var onRenderResuming: (() -> Void)?
 
     /// Called after every display-link render (`tick`).
     ///
@@ -244,12 +251,18 @@ final class TerminalSurfaceCoordinator {
         }
 
         isDisplayVisible = visible
+        if visible {
+            onRenderResuming?()
+        }
         surface?.setOcclusion(effectiveSurfaceVisible)
 
         if canRenderFrame {
             requestImmediateTick()
         } else {
             stopDisplayLink()
+            if !visible {
+                onRenderSuspended?()
+            }
         }
     }
 
