@@ -53,6 +53,23 @@ struct InMemoryTerminalSessionOutputQueueTests {
     }
 
     @Test
+    func `output received before surface attachment is flushed in order`() {
+        let writes = LockedValues<String>()
+        let session = makeSession { _, data in
+            writes.append(String(decoding: data, as: UTF8.self))
+        }
+
+        session.receive("before-")
+        session.receive("attach")
+        #expect(writes.values.isEmpty)
+
+        session.setSurface(testSurface(6))
+        session.waitForPendingOutput()
+
+        #expect(writes.values == ["before-attach"])
+    }
+
+    @Test
     func `surface teardown waits for active write and drops queued stale writes`() {
         let firstWriteStarted = DispatchSemaphore(value: 0)
         let allowFirstWriteToFinish = DispatchSemaphore(value: 0)

@@ -82,6 +82,22 @@
             true
         }
 
+        #if !targetEnvironment(macCatalyst)
+            /// Applies a host-selected font size while keeping pinch and
+            /// hardware-keyboard zoom anchored to the same value.
+            open func setTerminalFontSize(_ size: Float) {
+                let resolved = min(max(size, Self.minFontSize), Self.maxFontSize)
+                guard abs(currentFontSize - resolved) > 0.01 else { return }
+                currentFontSize = resolved
+                guard let controller else { return }
+                _ = controller.setTerminalConfiguration(
+                    controller.terminalConfiguration.fontSize(resolved)
+                )
+                core.synchronizeMetrics()
+                refreshTextInputGeometry(reason: "host-font-size")
+            }
+        #endif
+
         override open var canBecomeFirstResponder: Bool {
             true
         }
@@ -102,7 +118,13 @@
             isUserInteractionEnabled = true
             updateDisplayScale()
 
-            core.isAttached = { [weak self] in self?.window != nil }
+            // Keep app wakeups flowing for an existing surface while SwiftUI
+            // temporarily removes this view from the hierarchy. Rendering is
+            // gated separately by display visibility.
+            core.isAttached = { [weak self] in
+                guard let self else { return false }
+                return window != nil || surface != nil
+            }
             core.scaleFactor = { [weak self] in
                 Double(self?.resolvedDisplayScale() ?? UIScreen.main.nativeScale)
             }

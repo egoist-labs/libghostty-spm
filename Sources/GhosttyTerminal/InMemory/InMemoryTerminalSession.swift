@@ -10,10 +10,13 @@ import GhosttyKit
 
 public final class InMemoryTerminalSession: @unchecked Sendable {
     private static let slowSurfaceWriteThreshold: TimeInterval = 0.5
+    private static let maximumPendingBytes = 8 * 1_024 * 1_024
 
     private let resizeLock = NSLock()
+    private let pendingOutputLock = NSLock()
     private let surfaceAccess: InMemoryTerminalSurfaceAccess
     private var lastResize: InMemoryTerminalViewport?
+    private var pendingOutput = Data()
     private let writeHandler: @Sendable (Data) -> Void
     private let resizeHandler: @Sendable (InMemoryTerminalViewport) -> Void
 
@@ -47,7 +50,27 @@ public final class InMemoryTerminalSession: @unchecked Sendable {
     // MARK: - Surface Lifecycle
 
     func setSurface(_ surface: ghostty_surface_t?) {
+        // A host-managed transport can receive data before UIKit has attached
+        // and sized its first surface. Coordinate surface installation with
+        // the pending buffer so no bytes fall into that attachment race.
+        pendingOutputLock.lock()
         surfaceAccess.setSurface(surface)
+        let bufferedOutput: Data
+        if surface != nil {
+            bufferedOutput = pendingOutput
+            pendingOutput.removeAll(keepingCapacity: true)
+        } else {
+            bufferedOutput = Data()
+        }
+        pendingOutputLock.unlock()
+
+        if !bufferedOutput.isEmpty {
+            _ = surfaceAccess.enqueueWrite(bufferedOutput)
+            TerminalDebugLog.log(
+                .output,
+                "terminal <- host flushed buffered \(TerminalDebugLog.describe(bufferedOutput))"
+            )
+        }
         TerminalDebugLog.log(
             .lifecycle,
             "in-memory session surface=\(surface == nil ? "nil" : "set")"
@@ -138,17 +161,35 @@ public final class InMemoryTerminalSession: @unchecked Sendable {
     /// Writes are processed in order on a per-session serial queue so parsing
     /// cannot block the caller or the main thread.
     public func receive(_ data: Data) {
-        guard surfaceAccess.enqueueWrite(data) else {
+        guard !data.isEmpty else { return }
+        if surfaceAccess.enqueueWrite(data) {
             TerminalDebugLog.log(
                 .output,
-                "terminal <- host dropped \(TerminalDebugLog.describe(data))"
+                "terminal <- host \(TerminalDebugLog.describe(data))"
             )
             return
         }
 
+        pendingOutputLock.lock()
+        if surfaceAccess.enqueueWrite(data) {
+            pendingOutputLock.unlock()
+            TerminalDebugLog.log(
+                .output,
+                "terminal <- host \(TerminalDebugLog.describe(data))"
+            )
+            return
+        }
+
+        pendingOutput.append(data)
+        if pendingOutput.count > Self.maximumPendingBytes {
+            pendingOutput.removeFirst(
+                pendingOutput.count - Self.maximumPendingBytes
+            )
+        }
+        pendingOutputLock.unlock()
         TerminalDebugLog.log(
             .output,
-            "terminal <- host \(TerminalDebugLog.describe(data))"
+            "terminal <- host buffered \(TerminalDebugLog.describe(data))"
         )
     }
 
@@ -257,7 +298,9 @@ public final class InMemoryTerminalSession: @unchecked Sendable {
         )
     }
 
-    func waitForPendingOutput() {
+    /// Blocks until host output already submitted to this session has been
+    /// applied to the terminal surface.
+    public func waitForPendingOutput() {
         surfaceAccess.waitForPendingOutput()
     }
 

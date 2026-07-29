@@ -51,9 +51,18 @@
             )
             updateDisplayScale()
             if window != nil {
-                core.rebuildIfReady()
+                // SwiftUI temporarily detaches representable views during
+                // navigation. Reusing the surface preserves the terminal
+                // grid and scrollback when the session is reopened.
+                if surface == nil {
+                    core.rebuildIfReady()
+                } else {
+                    core.synchronizeMetrics()
+                }
+                core.setDisplayVisible(true)
                 updateColorScheme()
                 core.startDisplayLink()
+                core.requestImmediateTick()
                 // Defer sublayer frame and metrics sync to the next runloop
                 // so that AutoLayout has resolved final bounds.
                 DispatchQueue.main.async { [weak self] in
@@ -63,7 +72,8 @@
                 }
             } else {
                 core.stopDisplayLink()
-                core.freeSurface()
+                core.setFocus(false)
+                core.setDisplayVisible(false)
             }
         }
 
