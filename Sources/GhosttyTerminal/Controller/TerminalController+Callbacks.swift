@@ -30,7 +30,7 @@ enum TerminalClipboardIO {
     /// instead of the general pasteboard. Only the terminal itself reads it
     /// back (middle-click primary paste).
     #if canImport(AppKit) && !canImport(UIKit)
-        private static let selectionPasteboard = NSPasteboard(
+        nonisolated(unsafe) static let selectionPasteboard = NSPasteboard(
             name: NSPasteboard.Name("dev.kero.terminal.selection")
         )
     #endif
