@@ -254,6 +254,56 @@ struct TerminalClipboardCallbackTests {
     }
 
     @Test
+    func `selection write stays off the general pasteboard`() {
+        let originalWrite = TerminalClipboardIO.writeString
+        let originalSelection = TerminalClipboardIO.writeSelectionString
+        defer {
+            TerminalClipboardIO.writeString = originalWrite
+            TerminalClipboardIO.writeSelectionString = originalSelection
+        }
+        var written: String?
+        var selectionWritten: String?
+        TerminalClipboardIO.writeString = { written = $0 }
+        TerminalClipboardIO.writeSelectionString = { selectionWritten = $0 }
+
+        invokeWriteCallback("selected text", clipboard: GHOSTTY_CLIPBOARD_SELECTION, confirm: false)
+
+        #expect(written == nil)
+        #expect(selectionWritten == "selected text")
+    }
+
+    @Test
+    func `selection read uses the selection pasteboard`() {
+        let originalRead = TerminalClipboardIO.readString
+        let originalSelectionRead = TerminalClipboardIO.readSelectionString
+        let originalComplete = TerminalClipboardIO.complete
+        defer {
+            TerminalClipboardIO.readString = originalRead
+            TerminalClipboardIO.readSelectionString = originalSelectionRead
+            TerminalClipboardIO.complete = originalComplete
+        }
+        TerminalClipboardIO.readString = { nil }
+        TerminalClipboardIO.readSelectionString = { "middle click text" }
+        var completed: String?
+        TerminalClipboardIO.complete = { _, string, _, _ in
+            completed = String(cString: string)
+        }
+
+        let bridge = makeBridge()
+        var state = 0
+        let handled = withUnsafeMutablePointer(to: &state) { statePtr in
+            terminalControllerReadClipboardCallback(
+                userdata: Unmanaged.passUnretained(bridge).toOpaque(),
+                clipboard: GHOSTTY_CLIPBOARD_SELECTION,
+                opaquePtr: statePtr
+            )
+        }
+
+        #expect(handled)
+        #expect(completed == "middle click text")
+    }
+
+    @Test
     func `paste read completes unconfirmed so core keeps paste authority`() {
         let originalRead = TerminalClipboardIO.readString
         let originalComplete = TerminalClipboardIO.complete
@@ -318,14 +368,18 @@ struct TerminalClipboardCallbackTests {
         }
     }
 
-    private func invokeWriteCallback(_ text: String, confirm: Bool) {
+    private func invokeWriteCallback(
+        _ text: String,
+        clipboard: ghostty_clipboard_e = GHOSTTY_CLIPBOARD_STANDARD,
+        confirm: Bool
+    ) {
         text.withCString { data in
             "text/plain".withCString { mime in
                 let content = ghostty_clipboard_content_s(mime: mime, data: data)
                 withUnsafePointer(to: content) { contentsPtr in
                     terminalControllerWriteClipboardCallback(
                         userdata: nil,
-                        clipboard: GHOSTTY_CLIPBOARD_STANDARD,
+                        clipboard: clipboard,
                         contents: contentsPtr,
                         contentsLen: 1,
                         confirm: confirm
