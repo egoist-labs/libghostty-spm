@@ -146,9 +146,29 @@
         }
 
         override open func setFrameSize(_ newSize: NSSize) {
+            let sizeChanged = newSize != frame.size
+            let coversDiscreteResize = sizeChanged
+                && !rendererTargetsCompacted
+                && window?.inLiveResize != true
+            if coversDiscreteResize {
+                capturePresentationFrame()
+            }
             super.setFrameSize(newSize)
-            core.fitToSize()
-            core.requestImmediateTick()
+            if sizeChanged {
+                // The first draw commits the resized grid; the following
+                // three replace Ghostty's retained IOSurface frame states.
+                // During live window dragging, keep the normal single-frame
+                // cadence rather than doing the discrete-layout warm-up.
+                core.fitToSizeAndRenderNow(
+                    frameCount: window?.inLiveResize == true ? 1 : 4
+                )
+                if coversDiscreteResize {
+                    reattachPresentationCoverIfNeeded()
+                    releasePresentationCoverAfterRendererSettles()
+                }
+            } else {
+                core.fitToSize()
+            }
         }
 
         override open func layout() {

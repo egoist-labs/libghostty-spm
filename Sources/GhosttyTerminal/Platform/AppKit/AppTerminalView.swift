@@ -20,6 +20,9 @@
         var pendingSelectionMenuPoint: CGPoint?
         var onFocusChange: ((Bool) -> Void)?
         var rendererTargetsCompacted = false
+        let presentationCoverLayer = CALayer()
+        var presentationCoverGeneration: UInt64 = 0
+        var hasCapturedPresentationFrame = false
 
         /// Pointer shape ghostty last asked for. Seeded with `.text` because
         /// that is what the grid resolves to, and ghostty only emits the action
@@ -77,6 +80,10 @@
             metalLayer = metal
             layer?.backgroundColor = NSColor.clear.cgColor
 
+            presentationCoverLayer.contentsGravity = .topLeft
+            presentationCoverLayer.masksToBounds = true
+            presentationCoverLayer.isHidden = true
+
             inputHandler = TerminalKeyEventHandler(view: self)
             setupTrackingArea()
 
@@ -104,7 +111,9 @@
                 self?.updateMetalLayerMetrics()
             }
             core.onPostRender = { [weak self] in
-                self?.enforceMetalLayerScale()
+                guard let self else { return }
+                enforceMetalLayerScale()
+                reattachPresentationCoverIfNeeded()
             }
             core.onMouseShapeChange = { [weak self] shape in
                 self?.applyMouseShape(shape)

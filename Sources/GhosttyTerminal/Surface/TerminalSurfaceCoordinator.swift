@@ -244,6 +244,21 @@ final class TerminalSurfaceCoordinator {
         }
     }
 
+    /// A visible AppKit resize must publish replacement IOSurfaces before
+    /// returning to the window server. Deferring these draws to the next
+    /// runloop briefly exposes Ghostty's cleared resize target, while filling
+    /// only the cursor damage before the rest of the grid catches up.
+    func fitToSizeAndRenderNow(frameCount: Int) {
+        if surface == nil {
+            rebuildIfReady()
+        } else {
+            synchronizeMetrics()
+        }
+        for _ in 0..<max(1, frameCount) where surface != nil {
+            renderImmediately()
+        }
+    }
+
     func setDisplayVisible(_ visible: Bool) {
         guard isDisplayVisible != visible else {
             surface?.setOcclusion(effectiveSurfaceVisible)
@@ -252,17 +267,22 @@ final class TerminalSurfaceCoordinator {
 
         isDisplayVisible = visible
         if visible {
+            // Renderer-target restoration must happen after Ghostty is
+            // unoccluded. Draws submitted while occluded are discarded,
+            // leaving an old target that contains only cursor damage.
+            surface?.setOcclusion(effectiveSurfaceVisible)
             onRenderResuming?()
+        } else {
+            // Compact while draws are still accepted, then occlude the
+            // surface so future wakeups do not allocate or present frames.
+            onRenderSuspended?()
+            surface?.setOcclusion(effectiveSurfaceVisible)
         }
-        surface?.setOcclusion(effectiveSurfaceVisible)
 
         if canRenderFrame {
             requestImmediateTick()
         } else {
             stopDisplayLink()
-            if !visible {
-                onRenderSuspended?()
-            }
         }
     }
 
