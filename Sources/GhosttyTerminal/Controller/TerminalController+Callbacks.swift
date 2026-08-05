@@ -25,6 +25,24 @@ enum TerminalClipboardIO {
         #endif
     }
 
+    /// Private selection pasteboard, mirroring the Ghostty macOS app's
+    /// `com.mitchellh.ghostty.selection`: copy-on-select content lives here
+    /// instead of the general pasteboard. Only the terminal itself reads it
+    /// back (middle-click primary paste).
+    #if canImport(AppKit) && !canImport(UIKit)
+        nonisolated(unsafe) static let selectionPasteboard = NSPasteboard(
+            name: NSPasteboard.Name("dev.kero.terminal.selection")
+        )
+    #endif
+
+    nonisolated(unsafe) static var readSelectionString: () -> String? = {
+        #if canImport(UIKit)
+            nil
+        #elseif canImport(AppKit)
+            TerminalPasteboard.string(from: selectionPasteboard)
+        #endif
+    }
+
     nonisolated(unsafe) static var writeString: (String) -> Void = { string in
         #if canImport(UIKit)
             UIPasteboard.general.string = string
@@ -32,6 +50,16 @@ enum TerminalClipboardIO {
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(string, forType: .string)
+        #endif
+    }
+
+    nonisolated(unsafe) static var writeSelectionString: (String) -> Void = { string in
+        #if canImport(UIKit)
+            // iOS has no selection clipboard; copy-on-select targets general.
+            UIPasteboard.general.string = string
+        #elseif canImport(AppKit)
+            selectionPasteboard.clearContents()
+            selectionPasteboard.setString(string, forType: .string)
         #endif
     }
 
@@ -89,7 +117,7 @@ private enum TerminalCallbacks {
 
     static func writeClipboard(
         userdata _: UnsafeMutableRawPointer?,
-        clipboard _: ghostty_clipboard_e,
+        clipboard: ghostty_clipboard_e,
         contents: UnsafePointer<ghostty_clipboard_content_s>?,
         contentsLen: Int,
         confirm: Bool
@@ -109,12 +137,21 @@ private enum TerminalCallbacks {
         guard let content = contents?.pointee else { return }
         guard let data = content.data else { return }
 
-        TerminalClipboardIO.writeString(String(cString: data))
+        // Copy-on-select targets the selection clipboard; keep it off the
+        // general pasteboard so mouse selections don't clobber the system
+        // clipboard (matches the Ghostty macOS app, which uses its own
+        // named pasteboard for this).
+        switch clipboard {
+        case GHOSTTY_CLIPBOARD_SELECTION:
+            TerminalClipboardIO.writeSelectionString(String(cString: data))
+        default:
+            TerminalClipboardIO.writeString(String(cString: data))
+        }
     }
 
     static func readClipboard(
         userdata: UnsafeMutableRawPointer?,
-        clipboard _: ghostty_clipboard_e,
+        clipboard: ghostty_clipboard_e,
         opaquePtr: UnsafeMutableRawPointer?
     ) -> Bool {
         guard let userdata, let opaquePtr else { return false }
@@ -124,7 +161,15 @@ private enum TerminalCallbacks {
             .takeUnretainedValue()
         guard let surface = bridge.rawSurface else { return false }
 
-        guard let string = TerminalClipboardIO.readString() else {
+        // Middle-click primary paste reads the selection clipboard; the
+        // normal paste path reads the general pasteboard.
+        let string = switch clipboard {
+        case GHOSTTY_CLIPBOARD_SELECTION:
+            TerminalClipboardIO.readSelectionString()
+        default:
+            TerminalClipboardIO.readString()
+        }
+        guard let string else {
             TerminalDebugLog.log(.input, "clipboard paste read empty")
             return false
         }
